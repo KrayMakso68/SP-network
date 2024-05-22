@@ -1,3 +1,7 @@
+from math import log2
+
+
+# s_box_N: int = int(input("Введите число S-блоков: "))
 # input_x: int = int(input('Введите входное число в битовом формате: ').strip(), 2)
 # key: int = int(input('Введите ключ в битовом формате: ').strip(), 2)
 # s_box: [int] = list(map(int, input('Введите s-блок через пробел: ').split()))
@@ -21,7 +25,7 @@ def sum_key(input_num: int, key: int) -> int:
     return input_num ^ key
 
 
-def s_box_step(input_num: int, s_block: [int]) -> int:
+def s_box_step(input_num: int, s_block: list[int]) -> int:
     array = list(map(int, number_to_byte_str(input_num, fill=9)))
     pos = 0
     while pos < len(array):
@@ -48,7 +52,7 @@ def inv_s_box(input_s_box):
     return out
 
 
-def encode(input_num: int, key: int, input_s_box: [int]) -> int:
+def encode(input_num: int, key: int, input_s_box: list[int]) -> int:
     full_round_count = 2
     out = input_num
     for _ in range(full_round_count):
@@ -57,7 +61,7 @@ def encode(input_num: int, key: int, input_s_box: [int]) -> int:
     return out
 
 
-def decode(input_num: int, key: int, inv_s_box: [int]) -> int:
+def decode(input_num: int, key: int, inv_s_box: list[int]) -> int:
     full_round_count = 2
     out = sum_key(s_box_step(sum_key(input_num, key), inv_s_box), key)
     for i in range(full_round_count):
@@ -72,3 +76,50 @@ def decode(input_num: int, key: int, inv_s_box: [int]) -> int:
 #
 # out2 = decode(out1, key, inv_s_box(s_box))
 # print('Decoded number: ', number_to_byte_str(out2))
+
+# print(int(log2(8)))
+
+print(number_to_byte_str(byte_arr_swap(byte_str_to_number('111000111'))))
+
+
+def gen_pbox(s, n):
+    """
+    Generate a balanced permutation box for an SPN.
+
+    Parameters
+    ----------
+    s : int
+        Number of bits per S-box.
+    n : int
+        Number of S-boxes.
+
+    Returns
+    -------
+    list of int
+        The generated P-box.
+
+    """
+    return [(s * i + j) % (n * s) for j in range(s) for i in range(n)]
+
+
+def perm(inp: int) -> int:
+    """
+    Apply the P-box permutation on the input.
+
+    Parameters
+    ----------
+    inp : int
+        The input value to apply the P-box permutation on.
+
+    Returns
+    -------
+    int
+        The permuted value after applying the P-box.
+    """
+    ct = 0
+    for i, v in enumerate(gen_pbox(3, 3)):
+        ct |= (inp >> (len(gen_pbox(3, 3)) - 1 - i) & 1) << (len(gen_pbox(3, 3)) - 1 - v)
+    return ct
+
+
+print(number_to_byte_str(perm(byte_str_to_number('111000111'))))
