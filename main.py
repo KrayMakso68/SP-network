@@ -1,17 +1,19 @@
-from sp_network import encode, decode
+from spn import SPN, gen_pbox, int_to_byte_str_with_fill
 import customtkinter
 import re
 
+customtkinter.set_appearance_mode("dark")
+
 app = customtkinter.CTk()
 app.title("my app")
-app.geometry("650x500")
+app.geometry("850x550")
 
 tabview = customtkinter.CTkTabview(master=app)
 tabview.pack(expand=True, fill='both', padx=5, pady=(0, 5))
 
-tabview.add("Шифратор")  # add tab at the end
-tabview.add("Метод встречи по середине")  # add tab at the end
-tabview.set("Шифратор")  # set currently visible tab
+tabview.add("Шифратор")
+tabview.add("Метод встречи по середине")
+tabview.set("Шифратор")
 
 
 def validate_binary_string(newval):
@@ -21,8 +23,8 @@ def validate_binary_string(newval):
         return False
 
 
-def validate_1_or_0_string(newval):
-    if re.match('^[01]{0,1}$', newval):
+def validate_s_box(newval):
+    if re.match('^[0-7]?$', newval):
         return True
     else:
         return False
@@ -40,22 +42,41 @@ def check_configuration() -> bool:
         error_key_label.configure(text='Ошибка ввода ключа\nЧисло должно быть девятизначным')
     else:
         error_key_label.configure(text='')
+    s_box_list = []
+    error_s_box_label.configure(text='')
     for entry in entry_s_box_list:
-        if len(entry.get()) == 0:
+        value = entry.get()
+        if len(value) == 0:
             error = True
             error_s_box_label.configure(text='Ошибка ввода значений S-блока\nВведите все значения S-блока')
             break
-        else:
-            error_s_box_label.configure(text='')
+        if int(value) in s_box_list:
+            error = True
+            error_s_box_label.configure(text='Ошибка ввода значений S-блока\nЗначения S-блока дублируются')
+            break
+        s_box_list.append(int(value))
     return error
 
 
 def start_encryption():
-    print(check_configuration())
+    cipher_text_entry.configure(state='normal')
+    cipher_text_entry.delete(0, 9)
+    if not check_configuration():
+        plaintext = int(plaintext_entry.get(), 2)
+        key = int(key_entry.get(), 2)
+        s_box = [int(entry.get()) for entry in entry_s_box_list]
+        p_box = gen_pbox(3, 3)
+        rounds = 2
+        sp = SPN(s_box, p_box, key, rounds)
+        encrypted_plaintext = sp.encrypt(plaintext)
+        cipher_text_entry.insert(0, int_to_byte_str_with_fill(encrypted_plaintext, s=3, n=3))
+        cipher_text_entry.configure(state='disable')
 
 
-plaintext_frame = customtkinter.CTkFrame(master=tabview.tab("Шифратор"), fg_color='gray20')
+# рамка ввода открытого текста
 tabview.tab("Шифратор").columnconfigure(0, weight=1)
+plaintext_frame = customtkinter.CTkFrame(master=tabview.tab("Шифратор"), fg_color='gray20')
+plaintext_frame.columnconfigure(0, weight=1)
 plaintext_frame.grid(row=0, column=0, sticky='ew', padx=20)
 plaintext_label = customtkinter.CTkLabel(master=plaintext_frame, text='Открытый текст')
 plaintext_label.grid(row=0, sticky='w', padx=10, pady=(10, 0))
@@ -75,8 +96,10 @@ error_plaintext_label = customtkinter.CTkLabel(master=plaintext_frame,
                                                )
 error_plaintext_label.grid(row=2, sticky='w', padx=10, pady=(2, 10))
 
-key_frame = customtkinter.CTkFrame(master=tabview.tab("Шифратор"), fg_color='gray20')
+# рамка ввода ключа
 tabview.tab("Шифратор").columnconfigure(1, weight=1)
+key_frame = customtkinter.CTkFrame(master=tabview.tab("Шифратор"), fg_color='gray20')
+key_frame.columnconfigure(0, weight=1)
 key_frame.grid(row=0, column=1, sticky='ew', padx=20)
 key_label = customtkinter.CTkLabel(master=key_frame, text='Ключ зашифрования')
 key_label.grid(row=0, sticky='w', padx=10, pady=(10, 0))
@@ -87,7 +110,7 @@ key_entry = customtkinter.CTkEntry(master=key_frame,
                                    validate="key",
                                    validatecommand=(app.register(validate_binary_string), '%P')
                                    )
-key_entry.grid(row=1, sticky='nsew', padx=10, pady=(5, 10))
+key_entry.grid(row=1, sticky='ew', padx=10, pady=(5, 10))
 error_key_label = customtkinter.CTkLabel(master=key_frame,
                                          text='',
                                          text_color='brown2',
@@ -96,52 +119,51 @@ error_key_label = customtkinter.CTkLabel(master=key_frame,
                                          )
 error_key_label.grid(row=2, sticky='we', padx=10, pady=(2, 10))
 
-s_box_frame = customtkinter.CTkFrame(master=tabview.tab("Шифратор"), fg_color='gray20')
+# рамка ввода S-блока
 tabview.tab("Шифратор").rowconfigure(1, weight=1)
-s_box_frame.grid(row=1, sticky='nsew', columnspan=2, padx=20, pady=20)
+s_box_frame = customtkinter.CTkScrollableFrame(master=tabview.tab("Шифратор"), fg_color='gray20', orientation='horizontal')
+s_box_frame.columnconfigure(0, weight=1)
+s_box_frame.grid(row=1, sticky='ew', columnspan=2, padx=20, pady=20)
 s_box_label = customtkinter.CTkLabel(master=s_box_frame, text='S-блок')
-s_box_label.grid(row=0, sticky='w', padx=20, pady=(10, 5))
+s_box_label.grid(row=0, sticky='w', padx=10, pady=(10, 5))
 input_s_box_frame = customtkinter.CTkFrame(master=s_box_frame, fg_color='gray30')
-input_s_box_frame.grid(row=1, sticky='ew', padx=20, pady=(0, 10), ipadx=10)
+input_s_box_frame.grid(row=1, sticky='nsew', padx=10, pady=(0, 10), ipadx=10)
 in_s_box_label = customtkinter.CTkLabel(master=input_s_box_frame, text='ВХОД')
 in_s_box_label.grid(row=0, column=0, padx=5)
 out_s_box_label = customtkinter.CTkLabel(master=input_s_box_frame, text='ВЫХОД')
 out_s_box_label.grid(row=1, column=0, padx=5)
 
 # инпупы для клеток S-блока
-for i in range(8):
-    ent = customtkinter.CTkEntry(master=input_s_box_frame, width=22, state='normal')
+for i in range(16):
+    ent = customtkinter.CTkEntry(master=input_s_box_frame, width=35, state='normal')
     ent.insert(0, f'{i}')
     ent.grid(row=0, column=i + 1, pady=(5, 2))
     ent.configure(state='disable')
 
 # инпуты для ввода значений S-блока
 entry_s_box_list = []
-for i in range(8):
+for i in range(16):
     ent = customtkinter.CTkEntry(master=input_s_box_frame,
-                                 width=22,
+                                 width=35,
                                  state='normal',
                                  validate="key",
-                                 validatecommand=(app.register(validate_1_or_0_string), '%P')
+                                 validatecommand=(app.register(validate_s_box), '%P')
                                  )
     ent.grid(row=1, column=i + 1, pady=(2, 5))
     entry_s_box_list.append(ent)
-    # для валидации кнопок в цикле for
-    # https://stackoverflow.com/questions/32037769/how-do-i-link-python-tkinter-widgets-created-in-a-for-loop
-    # валидация
-    # https://pythonru.com/uroki/sozdanie-izmenenie-i-proverka-teksta-tkinter-2
-    # https://metanit.com/python/tkinter/2.8.php
-error_s_box_label = customtkinter.CTkLabel(master=s_box_frame, text='', text_color='brown2')
-error_s_box_label.grid(row=1, column=1, sticky='w', padx=20, pady=(2, 5))
 
+error_s_box_label = customtkinter.CTkLabel(master=s_box_frame, text='', text_color='brown2', height=35)
+error_s_box_label.grid(row=2, column=0, sticky='w', padx=20, pady=(2, 5))
+
+# рамка вывода зашифрованного текста
 cipher_text_frame = customtkinter.CTkFrame(master=tabview.tab("Шифратор"), fg_color='gray20')
+cipher_text_frame.columnconfigure(0, weight=1)
 cipher_text_frame.grid(row=2, column=0, sticky='ew', padx=20, pady=(0, 20))
 cipher_text_label = customtkinter.CTkLabel(master=cipher_text_frame, text='Зашифрованный текст')
 cipher_text_label.grid(row=0, sticky='w', padx=10, pady=(10, 0))
 cipher_text_entry = customtkinter.CTkEntry(master=cipher_text_frame,
                                            height=40,
-                                           font=('', 18),
-                                           placeholder_text='010101010',
+                                           font=('', 18)
                                            )
 cipher_text_entry.grid(row=1, sticky='nsew', padx=10, pady=(5, 10))
 cipher_text_entry.configure(state='disable')
@@ -151,5 +173,6 @@ start_encryption_button = customtkinter.CTkButton(master=tabview.tab("Шифра
                                                   command=start_encryption
                                                   )
 start_encryption_button.grid(row=2, column=1, sticky='ew', padx=20, pady=(0, 20))
+
 
 app.mainloop()

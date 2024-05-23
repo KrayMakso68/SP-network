@@ -14,36 +14,7 @@ to perform encryption and decryption operations.
 """
 from math import log2
 
-__all__ = ["rotate_left", "gen_pbox", "SPN"]
-
-
-def rotate_left(val, shift, mod):
-    """
-    Rotate the bits of the value to the left by the shift amount.
-
-    Parameters
-    ----------
-    val : int
-        The value to be rotated.
-    shift : int
-        The number of places to shift the value to the left.
-    mod : int
-        The modulo to be applied on the result.
-
-    Returns
-    -------
-    int
-        The rotated value.
-
-    Notes
-    -----
-    The function rotates the bits of the value to the left by the shift amount,
-    wrapping the bits that overflow. The result is then masked by (1<<mod)-1
-    to only keep the mod number of least significant bits.
-
-    """
-    shift = shift % mod
-    return (val << shift | val >> (mod - shift)) & ((1 << mod) - 1)
+__all__ = ["gen_pbox", "SPN", "int_to_byte_str_with_fill"]
 
 
 def gen_pbox(s, n):
@@ -66,6 +37,29 @@ def gen_pbox(s, n):
     return [(s * i + j) % (n * s) for j in range(s) for i in range(n)]
 
 
+def int_to_byte_str_with_fill(num, s, n):
+    """
+    Convert an integer to a byte string with fill character.
+
+    Parameters
+    ----------
+    num: int
+        Integer to convert.
+    s : int
+        Number of bits per S-box.
+    n : int
+        Number of S-boxes.
+
+    Returns
+    -------
+    str
+        Byte string.
+
+    """
+    fill = s * n
+    return "{0:b}".format(num).zfill(fill)
+
+
 class SPN:
     """
     Class representing the SPN (Substitution-Permutation Network) encryption algorithm.
@@ -80,12 +74,6 @@ class SPN:
         Apply the S-box substitution on the input.
     inv_sub(inp)
         Apply the inverse S-box substitution on the input.
-    int_to_list(inp)
-        Convert a len(pbox)-sized integer to a list of S-box sized integers.
-    list_to_int(lst)
-        Convert a list of S-box sized integers to a len(pbox)-sized integer.
-    expand_key(key, rounds)
-        Derive round keys deterministically from the given key.
     _enc_last_noperm(pt)
         Encrypt plaintext using the SPN, where the last round doesn't contain the permute operation.
     _enc_last_withperm(ct)
@@ -108,12 +96,11 @@ class SPN:
         pbox : list of int
             List of integers representing the P-box.
 
-        key : list of int or bytes or bytearray
-            List of integers, bytes, or bytearray representing the key.
-            LSB block_size bits will be used.
+        key : int
+            Key value
 
         rounds : int
-            Number of rounds for the SPN.
+            Number of rounds for the SPN. (full rounds)
 
         implementation : int, optional
             Implementation option. Default is 0.
@@ -128,7 +115,7 @@ class SPN:
         self.box_size = int(log2(len(sbox)))
         self.num_sbox = len(pbox) // self.box_size
         self.rounds = rounds
-        self.round_keys = self.expand_key(key, rounds)
+        self.key = key
         if implementation == 0:
             self.encrypt = self._enc_last_noperm
             self.decrypt = self._dec_last_noperm
@@ -153,7 +140,7 @@ class SPN:
         ct = 0
         for i, v in enumerate(self.pbox):
             ct |= (inp >> (self.block_size - 1 - i) & 1) << (
-                self.block_size - 1 - v)
+                    self.block_size - 1 - v)
         return ct
 
     def inv_perm(self, inp: int) -> int:
@@ -173,7 +160,7 @@ class SPN:
         ct = 0
         for i, v in enumerate(self.pinv):
             ct |= (inp >> (self.block_size - 1 - i) & 1) << (
-                self.block_size - 1 - v)
+                    self.block_size - 1 - v)
         return ct
 
     def sub(self, inp: int) -> int:
@@ -214,71 +201,6 @@ class SPN:
             ct |= self.sinv[(inp >> (i * bs)) & ((1 << bs) - 1)] << (bs * i)
         return ct
 
-    def int_to_list(self, inp):
-        """
-        Convert a len(pbox)-sized integer to a list of S-box sized integers.
-
-        Parameters
-        ----------
-        inp : int
-            An integer representing a len(pbox)-sized input.
-
-        Returns
-        -------
-        list of int
-            A list of integers, each representing an S-box sized input.
-        """
-        bs = self.box_size
-        return [(inp >> (i * bs)) & ((1 << bs) - 1)
-                for i in range(self.num_sbox - 1, -1, -1)]
-
-    def list_to_int(self, lst):
-        """
-        Convert a list of S-box sized integers to a len(pbox)-sized integer.
-
-        Parameters
-        ----------
-        lst : list of int
-            A list of integers, each representing an S-box sized input.
-
-        Returns
-        -------
-        int
-            An integer representing the combined input as a len(pbox)-sized integer.
-        """
-        res = 0
-        for i, v in enumerate(lst[::-1]):
-            res |= v << (i * self.box_size)
-        return res
-
-    def expand_key(self, key, rounds):
-        """
-        Derive round keys deterministically from the given key.
-
-        Parameters
-        ----------
-        key : list of int or bytes or bytearray
-            A list of integers, bytes, or bytearray representing the key.
-        rounds : int
-            The number of rounds for the SPN.
-
-        Returns
-        -------
-        list of int
-            A list of integers representing the derived round keys.
-        """
-        if isinstance(key, list):
-            key = self.list_to_int(key)
-        elif isinstance(key, (bytes, bytearray)):
-            key = int.from_bytes(key, 'big')
-        block_mask = (1 << self.block_size) - 1
-        key = key & block_mask
-        keys = [key]
-        for _ in range(rounds):
-            keys.append(self.sub(rotate_left(
-                keys[-1], self.box_size + 1, self.block_size)))
-        return keys
-
     def _enc_last_noperm(self, pt: int) -> int:
         """
         Encrypt plaintext using the SPN, where the last round doesn't contain the permute operation.
@@ -293,13 +215,13 @@ class SPN:
         int
             The ciphertext after encryption.
         """
-        ct = pt ^ self.round_keys[0]
-        for round_key in self.round_keys[1:-1]:
+        ct = pt ^ self.key
+        for _ in range(self.rounds):
             ct = self.sub(ct)
             ct = self.perm(ct)
-            ct ^= round_key
+            ct ^= self.key
         ct = self.sub(ct)
-        return ct ^ self.round_keys[-1]
+        return ct ^ self.key
 
     def _enc_last_withperm(self, ct: int) -> int:
         """
@@ -316,11 +238,11 @@ class SPN:
         int
             The ciphertext after encryption.
         """
-        for round_key in self.round_keys[:-1]:
-            ct ^= round_key
+        for _ in range(self.rounds):
+            ct ^= self.key
             ct = self.sub(ct)
             ct = self.perm(ct)
-        return ct ^ self.round_keys[-1]
+        return ct ^ self.key
 
     def _dec_last_noperm(self, ct: int) -> int:
         """
@@ -336,13 +258,13 @@ class SPN:
         int
             The plaintext after decryption.
         """
-        ct = ct ^ self.round_keys[-1]
+        ct = ct ^ self.key
         ct = self.inv_sub(ct)
-        for rk in self.round_keys[-2:0:-1]:
-            ct ^= rk
+        for _ in range(self.rounds):
+            ct ^= self.key
             ct = self.inv_perm(ct)
             ct = self.inv_sub(ct)
-        return ct ^ self.round_keys[0]
+        return ct ^ self.key
 
     def _dec_last_withperm(self, ct: int) -> int:
         """
@@ -358,9 +280,43 @@ class SPN:
         int
             The plaintext after decryption.
         """
-        ct = ct ^ self.round_keys[-1]
-        for rk in self.round_keys[-2::-1]:
+        ct = ct ^ self.key
+
+        for _ in range(self.rounds):
             ct = self.inv_perm(ct)
             ct = self.inv_sub(ct)
-            ct ^= rk
+            ct ^= self.key
         return ct
+
+# s_box = [0, 9, 13, 5, 7, 14, 10, 1, 11, 15, 2, 8, 3, 12, 4, 6]
+# p_box = gen_pbox(4, 4)
+# key = byte_str_to_number('1111000010010110')
+# rounds = 2
+#
+# sp = SPN(s_box, p_box, key, rounds)
+# enc = number_to_byte_str(sp.encrypt(byte_str_to_number('1001101011101011')))
+# dec = number_to_byte_str(sp.decrypt(byte_str_to_number(enc)))
+# print(enc, dec)
+
+# s_box = [0, 1, 3, 2, 5, 6, 4, 7]
+# p_box = gen_pbox(3, 3)
+# key = byte_str_to_number('111000111')
+# rounds = 2
+#
+# sp = SPN(s_box, p_box, key, rounds)
+# enc = number_to_byte_str(sp.encrypt(byte_str_to_number('101000100')))
+# dec = number_to_byte_str(sp.decrypt(byte_str_to_number(enc)))
+# print(enc, dec)
+
+# s_box = random.sample(range(256), 256)
+# p_box = gen_pbox(8, 3)
+# key = byte_str_to_number('111100001001011011110000')
+# rounds = 2
+#
+# sp = SPN(s_box, p_box, key, rounds)
+# enc = number_to_byte_str(sp.encrypt(byte_str_to_number('100110101110101110011010')))
+# dec = number_to_byte_str(sp.decrypt(byte_str_to_number(enc)))
+# print(enc, dec)
+
+# rr = random.sample(range(256), 256)
+# print(rr)
