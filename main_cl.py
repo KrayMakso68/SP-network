@@ -19,6 +19,23 @@ def validate_binary_string(newval):
         return False
 
 
+def validate_s_box(action, value_if_allowed):
+    input_limit = 2 ** S
+    if action == "1":  # Проверяем, что происходит ввод символа
+        try:
+            if len(value_if_allowed) > 1 and value_if_allowed[0] == "0":
+                return False
+            num = int(value_if_allowed)
+            if 0 <= num < input_limit:  # Проверяем, что число находится в диапазоне от 0 до limit
+                return True
+            else:
+                return False
+        except ValueError:
+            return False
+    else:
+        return True
+
+
 class TabView(customtkinter.CTkTabview):
     def __init__(self, master, **kwargs):
         super().__init__(master, **kwargs)
@@ -84,13 +101,74 @@ class InputСiphertextFrame(customtkinter.CTkFrame):
         self.error_key_label.grid(row=2, sticky='we', padx=10, pady=(2, 10))
 
 
+class SboxScrollableFrame(customtkinter.CTkScrollableFrame):
+    def __init__(self, master):
+        super().__init__(master, orientation='horizontal')
+
+        self.columnconfigure(0, weight=1)
+        self.configure(fg_color='gray20')
+
+        self.s_box_label = customtkinter.CTkLabel(master=self, text='S-блок')
+        self.s_box_label.grid(row=0, sticky='w', padx=10, pady=(10, 5))
+
+        self.input_s_box_frame = InputSboxFrame(master=self)
+        self.input_s_box_frame.grid(row=1, sticky='nsew', padx=10, pady=(0, 10), ipadx=10)
+
+        self.error_s_box_label = customtkinter.CTkLabel(master=self, text='', text_color='brown2', height=35)
+        self.error_s_box_label.grid(row=2, column=0, sticky='w', padx=20, pady=(2, 5))
+
+
+class InputSboxFrame(customtkinter.CTkFrame):
+    def __init__(self, master):
+        super().__init__(master)
+
+        self.configure(fg_color='gray30')
+
+        self.in_s_box_label = customtkinter.CTkLabel(master=self, text='ВХОД')
+        self.in_s_box_label.grid(row=0, column=0, padx=5)
+        self.out_s_box_label = customtkinter.CTkLabel(master=self, text='ВЫХОД')
+        self.out_s_box_label.grid(row=1, column=0, padx=5)
+
+        self.sbox_labels = self.create_sbox_labels(master=self)
+        self.sbox_entries = self.create_sbox_entries(master=self)
+
+    def create_sbox_labels(self, master):
+        label_s_box_list = []
+        global S
+        limit = 2 ** S
+        for i in range(limit):
+            ent = customtkinter.CTkEntry(master, width=35, state='normal')
+            ent.insert(0, f'{i}')
+            ent.grid(row=0, column=i + 1, pady=(5, 2))
+            ent.configure(state='disable')
+            label_s_box_list.append(ent)
+        return label_s_box_list
+
+    def create_sbox_entries(self, master):
+        entry_s_box_list = []
+        global S
+        limit = 2 ** S
+        for i in range(limit):
+            ent = customtkinter.CTkEntry(master=master,
+                                         width=35,
+                                         state='normal',
+                                         validate="key",
+                                         validatecommand=(self.register(validate_s_box), '%d', '%P')
+                                         )
+            ent.grid(row=1, column=i + 1, pady=(2, 5))
+            entry_s_box_list.append(ent)
+        return entry_s_box_list
+
+
 class ConfigurationFrame(customtkinter.CTkFrame):
-    def __init__(self, master, tab_view):
+    def __init__(self, master, root):
         super().__init__(master)
 
         self.columnconfigure((1, 2), weight=1)
         self.columnconfigure((0, 3), weight=2)
-        self.tab_view = tab_view
+
+        self.root = root
+        self.tab_view = root.tab_view
 
         customtkinter.CTkLabel(master=self,
                                text="Число входов в S-блок:"
@@ -129,6 +207,7 @@ class ConfigurationFrame(customtkinter.CTkFrame):
         Str_len = S * N
         Rounds = int(self.rounds_var.get())
         P_option = self.p_option_var.get()
+        self.root.update_sbox()
         self.tab_view.set("Шифратор")
 
 
@@ -148,10 +227,17 @@ class App(customtkinter.CTk):
         self.key_frame = InputСiphertextFrame(master=self.tab_view.tab("Шифратор"))
         self.key_frame.grid(row=0, column=1, sticky='ew', padx=20)
 
+        self.s_box_frame = SboxScrollableFrame(master=self.tab_view.tab("Шифратор"))
+        self.s_box_frame.grid(row=1, sticky='ew', columnspan=2, padx=20, pady=20)
+
         self.configuration_frame = ConfigurationFrame(master=self.tab_view.tab("Конфигурация шифратора"),
-                                                      tab_view=self.tab_view)
+                                                      root=self)
         self.configuration_frame.pack(fill='x', padx=10, pady=20)
 
+    def update_sbox(self):
+        self.s_box_frame.destroy()
+        self.s_box_frame = SboxScrollableFrame(master=self.tab_view.tab("Шифратор"))
+        self.s_box_frame.grid(row=1, sticky='ew', columnspan=2, padx=20, pady=20)
 
 app = App()
 app.mainloop()
