@@ -80,7 +80,7 @@ def start_encryption(r=rounds, s=S, n=N):
         p_box = gen_pbox(s, n)
         sp = SPN(s_box, p_box, key, r)
         encrypted_plaintext = sp.encrypt(plaintext)
-        cipher_text_entry.insert(0, int_to_byte_str_with_fill(encrypted_plaintext, bits_row_len))
+        cipher_text_entry.insert(0, int_to_byte_str_with_fill(encrypted_plaintext, S, N))
         cipher_text_entry.configure(state='disable')
 
 
