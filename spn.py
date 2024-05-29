@@ -14,7 +14,7 @@ to perform encryption and decryption operations.
 """
 from math import log2
 
-__all__ = ["gen_pbox", "SPN", "int_to_byte_str_with_fill"]
+__all__ = ["gen_pbox", "SPN", "int_to_str_with_fill"]
 
 
 def gen_pbox(s, n):
@@ -37,7 +37,7 @@ def gen_pbox(s, n):
     return [(s * i + j) % (n * s) for j in range(s) for i in range(n)]
 
 
-def int_to_byte_str_with_fill(num, s, n):
+def int_to_str_with_fill(num, str_len):
     """
     Convert an integer to a byte string with fill character.
 
@@ -45,10 +45,8 @@ def int_to_byte_str_with_fill(num, s, n):
     ----------
     num: int
         Integer to convert.
-    s : int
-        Number of bits per S-box.
-    n : int
-        Number of S-boxes.
+    str_len: int
+        Length of string to convert.
 
     Returns
     -------
@@ -56,7 +54,7 @@ def int_to_byte_str_with_fill(num, s, n):
         Byte string.
 
     """
-    fill = s * n
+    fill = str_len
     return "{0:b}".format(num).zfill(fill)
 
 
@@ -287,36 +285,3 @@ class SPN:
             ct = self.inv_sub(ct)
             ct ^= self.key
         return ct
-
-# s_box = [0, 9, 13, 5, 7, 14, 10, 1, 11, 15, 2, 8, 3, 12, 4, 6]
-# p_box = gen_pbox(4, 4)
-# key = byte_str_to_number('1111000010010110')
-# rounds = 2
-#
-# sp = SPN(s_box, p_box, key, rounds)
-# enc = number_to_byte_str(sp.encrypt(byte_str_to_number('1001101011101011')))
-# dec = number_to_byte_str(sp.decrypt(byte_str_to_number(enc)))
-# print(enc, dec)
-
-# s_box = [0, 1, 3, 2, 5, 6, 4, 7]
-# p_box = gen_pbox(3, 3)
-# key = byte_str_to_number('111000111')
-# rounds = 2
-#
-# sp = SPN(s_box, p_box, key, rounds)
-# enc = number_to_byte_str(sp.encrypt(byte_str_to_number('101000100')))
-# dec = number_to_byte_str(sp.decrypt(byte_str_to_number(enc)))
-# print(enc, dec)
-
-# s_box = random.sample(range(256), 256)
-# p_box = gen_pbox(8, 3)
-# key = byte_str_to_number('111100001001011011110000')
-# rounds = 2
-#
-# sp = SPN(s_box, p_box, key, rounds)
-# enc = number_to_byte_str(sp.encrypt(byte_str_to_number('100110101110101110011010')))
-# dec = number_to_byte_str(sp.decrypt(byte_str_to_number(enc)))
-# print(enc, dec)
-
-# rr = random.sample(range(256), 256)
-# print(rr)
