@@ -1,3 +1,4 @@
+import random
 import re
 
 import customtkinter
@@ -12,6 +13,19 @@ P_option: bool = False  # операция перестановки в конц�
 
 
 def validate_binary_string(newval):
+    """
+    Function to validate binary string taking into account the changing length of the string
+
+    Parameters
+    ----------
+    newval: str
+         String to be validated
+
+    Returns
+    -------
+    bool
+        True if the string is valid otherwise False
+    """
     reg_exp = '^[01]{0,' + str(Str_len) + '}$'
     if re.match(reg_exp, newval):
         return True
@@ -20,13 +34,29 @@ def validate_binary_string(newval):
 
 
 def validate_s_box(action, value_if_allowed):
+    """
+    Validate input in s_box
+
+    Parameters
+    ----------
+    value_if_allowed: str
+        Allowed input value
+    action: str
+        Type of operation
+
+    Returns
+    -------
+    bool
+        Release permission value
+
+    """
     input_limit = 2 ** S
-    if action == "1":  # Проверяем, что происходит ввод символа
+    if action == "1":
         try:
             if len(value_if_allowed) > 1 and value_if_allowed[0] == "0":
                 return False
             num = int(value_if_allowed)
-            if 0 <= num < input_limit:  # Проверяем, что число находится в диапазоне от 0 до limit
+            if 0 <= num < input_limit:
                 return True
             else:
                 return False
@@ -34,6 +64,24 @@ def validate_s_box(action, value_if_allowed):
             return False
     else:
         return True
+
+
+def generate_binary_string():
+    """
+    Generates a string of a given length, consisting of a random combination of 0 and 1.
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+    str
+        Returns a new generated string
+    """
+    binary_digits = ['0', '1']
+    length: int = Str_len
+    binary_string = ''.join(random.choices(binary_digits, k=length))
+    return binary_string
 
 
 class TabView(customtkinter.CTkTabview):
@@ -60,7 +108,7 @@ class InputPlaintextFrame(customtkinter.CTkFrame):
         self.plaintext_label.grid(row=0, sticky='w', padx=10, pady=(10, 0))
         self.plaintext_entry = customtkinter.CTkEntry(master=self,
                                                       height=40,
-                                                      placeholder_text='010101010',
+                                                      placeholder_text=generate_binary_string(),
                                                       font=('', 18),
                                                       validate="key",
                                                       validatecommand=(self.register(validate_binary_string), '%P')
@@ -74,8 +122,14 @@ class InputPlaintextFrame(customtkinter.CTkFrame):
                                                             )
         self.error_plaintext_label.grid(row=2, sticky='w', padx=10, pady=(2, 10))
 
+    def get(self):
+        return self.plaintext_entry.get()
 
-class InputСiphertextFrame(customtkinter.CTkFrame):
+    def set_error(self, error):
+        self.error_plaintext_label.configure(text=error)
+
+
+class InputKeyFrame(customtkinter.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
 
@@ -85,7 +139,7 @@ class InputСiphertextFrame(customtkinter.CTkFrame):
         self.key_label = customtkinter.CTkLabel(master=self, text='Ключ зашифрования')
         self.key_label.grid(row=0, sticky='w', padx=10, pady=(10, 0))
         self.key_entry = customtkinter.CTkEntry(master=self,
-                                                placeholder_text='010101010',
+                                                placeholder_text=generate_binary_string(),
                                                 height=40,
                                                 font=('', 18),
                                                 validate="key",
@@ -99,6 +153,12 @@ class InputСiphertextFrame(customtkinter.CTkFrame):
                                                       height=35
                                                       )
         self.error_key_label.grid(row=2, sticky='we', padx=10, pady=(2, 10))
+
+    def get(self):
+        return self.key_entry.get()
+
+    def set_error(self, error):
+        self.error_key_label.configure(text=error)
 
 
 class SboxScrollableFrame(customtkinter.CTkScrollableFrame):
@@ -117,6 +177,9 @@ class SboxScrollableFrame(customtkinter.CTkScrollableFrame):
         self.error_s_box_label = customtkinter.CTkLabel(master=self, text='', text_color='brown2', height=35)
         self.error_s_box_label.grid(row=2, column=0, sticky='w', padx=20, pady=(2, 5))
 
+    def set_error(self, error):
+        self.error_s_box_label.config(text=error)
+
 
 class InputSboxFrame(customtkinter.CTkFrame):
     def __init__(self, master):
@@ -129,8 +192,8 @@ class InputSboxFrame(customtkinter.CTkFrame):
         self.out_s_box_label = customtkinter.CTkLabel(master=self, text='ВЫХОД')
         self.out_s_box_label.grid(row=1, column=0, padx=5)
 
-        self.sbox_labels = self.create_sbox_labels(master=self)
-        self.sbox_entries = self.create_sbox_entries(master=self)
+        self.sbox_labels_list = self.create_sbox_labels(master=self)
+        self.sbox_entries_list = self.create_sbox_entries(master=self)
 
     def create_sbox_labels(self, master):
         label_s_box_list = []
@@ -158,6 +221,34 @@ class InputSboxFrame(customtkinter.CTkFrame):
             ent.grid(row=1, column=i + 1, pady=(2, 5))
             entry_s_box_list.append(ent)
         return entry_s_box_list
+
+    def get_sbox_entries(self):
+        return self.sbox_entries_list
+
+
+class OutСiphertextFrame(customtkinter.CTkFrame):
+    def __init__(self, master):
+        super().__init__(master)
+
+        self.columnconfigure(0, weight=1)
+        self.configure(fg_color='gray20')
+
+        customtkinter.CTkLabel(master=self, text='Зашифрованный текст').grid(row=0, sticky='w', padx=10, pady=(10, 0))
+        self.cipher_text_entry = customtkinter.CTkEntry(master=self, height=40, font=('', 18))
+        self.cipher_text_entry.grid(row=1, sticky='nsew', padx=10, pady=(5, 10))
+        self.cipher_text_entry.configure(state='disable')
+
+
+class StartEncryptionFrame(customtkinter.CTkFrame):
+    def __init__(self, master):
+        super().__init__(master)
+
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure((0, 2), weight=1)
+
+        self.start_encryption_button = customtkinter.CTkButton(master=self)
+        self.start_encryption_button.configure(text='Зашифровать', height=50)
+        self.start_encryption_button.grid(row=1, column=0, sticky='nsew')
 
 
 class ConfigurationFrame(customtkinter.CTkFrame):
@@ -207,7 +298,7 @@ class ConfigurationFrame(customtkinter.CTkFrame):
         Str_len = S * N
         Rounds = int(self.rounds_var.get())
         P_option = self.p_option_var.get()
-        self.root.update_sbox()
+        self.root.update_input()
         self.tab_view.set("Шифратор")
 
 
@@ -224,20 +315,72 @@ class App(customtkinter.CTk):
         self.plaintext_frame = InputPlaintextFrame(master=self.tab_view.tab("Шифратор"))
         self.plaintext_frame.grid(row=0, column=0, sticky='ew', padx=20)
 
-        self.key_frame = InputСiphertextFrame(master=self.tab_view.tab("Шифратор"))
+        self.key_frame = InputKeyFrame(master=self.tab_view.tab("Шифратор"))
         self.key_frame.grid(row=0, column=1, sticky='ew', padx=20)
 
         self.s_box_frame = SboxScrollableFrame(master=self.tab_view.tab("Шифратор"))
         self.s_box_frame.grid(row=1, sticky='ew', columnspan=2, padx=20, pady=20)
 
+        self.cipher_text_frame = OutСiphertextFrame(master=self.tab_view.tab("Шифратор"))
+        self.cipher_text_frame.grid(row=2, column=0, sticky='ew', padx=20, pady=(0, 20))
+
+        self.start_encryption_button = StartEncryptionFrame(master=self.tab_view.tab("Шифратор"))
+        self.start_encryption_button.grid(row=2, column=1, sticky='nsew', padx=20, pady=(0, 20))
+
         self.configuration_frame = ConfigurationFrame(master=self.tab_view.tab("Конфигурация шифратора"),
                                                       root=self)
         self.configuration_frame.pack(fill='x', padx=10, pady=20)
 
-    def update_sbox(self):
-        self.s_box_frame.destroy()
-        self.s_box_frame = SboxScrollableFrame(master=self.tab_view.tab("Шифратор"))
-        self.s_box_frame.grid(row=1, sticky='ew', columnspan=2, padx=20, pady=20)
+    def update_input(self):
+        self.plaintext_frame.plaintext_entry.destroy()
+        self.plaintext_frame.plaintext_entry = customtkinter.CTkEntry(master=self.plaintext_frame)
+        self.plaintext_frame.plaintext_entry.configure(height=40, placeholder_text=generate_binary_string(),
+                                                       font=('', 18),
+                                                       validate="key",
+                                                       validatecommand=(self.register(validate_binary_string), '%P'))
+        self.plaintext_frame.plaintext_entry.grid(row=1, sticky='nsew', padx=10, pady=(5, 10))
+
+        self.key_frame.key_entry.destroy()
+        self.key_frame.key_entry = customtkinter.CTkEntry(master=self.key_frame)
+        self.key_frame.key_entry.configure(placeholder_text=generate_binary_string(), height=40, font=('', 18),
+                                           validate="key",
+                                           validatecommand=(self.register(validate_binary_string), '%P'))
+        self.key_frame.key_entry.grid(row=1, sticky='ew', padx=10, pady=(5, 10))
+
+        self.s_box_frame.input_s_box_frame.destroy()
+        self.s_box_frame.input_s_box_frame = InputSboxFrame(master=self.s_box_frame)
+        self.s_box_frame.input_s_box_frame.grid(row=1, sticky='nsew', padx=10, pady=(0, 10), ipadx=10)
+
+    # def check_configuration(self):
+    #     global Str_len
+    #     entry_limit = Str_len
+    #     error = False
+    #
+    #     if len(self.plaintext_frame.get()) != entry_limit:
+    #         error = True
+    #         self.plaintext_frame.set_error('Ошибка ввода открытого текста\nЧисло должно быть девятизначным')
+    #     else:
+    #         self.plaintext_frame.set_error('')
+    #     if len(self.key_frame.get()) != entry_limit:
+    #         error = True
+    #         self.key_frame.set_error('Ошибка ввода ключа\nЧисло должно быть девятизначным')
+    #     else:
+    #         self.key_frame.set_error('')
+    #     s_box_list = []
+    #     self.s_box_frame.set_error('')
+    #     for entry in self.s_box_frame.input_s_box_frame.get_sbox_entries():
+    #         value = entry.get()
+    #         if len(value) == 0:
+    #             error = True
+    #             error_s_box_label.configure(text='Ошибка ввода значений S-блока\nВведите все значения S-блока')
+    #             break
+    #         if int(value) in s_box_list:
+    #             error = True
+    #             error_s_box_label.configure(text='Ошибка ввода значений S-блока\nЗначения S-блока дублируются')
+    #             break
+    #         s_box_list.append(int(value))
+    #     return error
+
 
 app = App()
 app.mainloop()

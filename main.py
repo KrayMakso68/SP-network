@@ -85,6 +85,7 @@ def start_encryption(r=rounds, s=S, n=N):
 
 
 def update_encryption_config():
+    global S, N, rounds, p_option
     S = int(S_var.get())
     N = int(N_var.get())
     rounds = int(rounds_var.get())
