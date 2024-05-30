@@ -1,5 +1,7 @@
 import random
 import re
+import time
+
 from spn import SPN, gen_pbox, int_to_str_with_fill
 import customtkinter
 
@@ -211,7 +213,7 @@ class InputSboxFrame(customtkinter.CTkFrame):
         return self.sbox_entries_list
 
 
-class OutСiphertextFrame(customtkinter.CTkFrame):
+class OutCiphertextFrame(customtkinter.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
 
@@ -234,13 +236,24 @@ class StartEncryptionFrame(customtkinter.CTkFrame):
     def __init__(self, master, command):
         super().__init__(master)
 
-        self.columnconfigure(0, weight=1)
-        self.rowconfigure((0, 2), weight=1)
+        self.columnconfigure((1, 2), weight=1)
+        self.rowconfigure((0, 2, 4), weight=1)
         self.start_command = command
 
         self.start_encryption_button = customtkinter.CTkButton(master=self)
         self.start_encryption_button.configure(text='Зашифровать', height=50, command=self.start_command)
-        self.start_encryption_button.grid(row=1, column=0, sticky='nsew')
+        self.start_encryption_button.grid(row=1, column=0, sticky='nsew', columnspan=3)
+
+        self.reset_input = customtkinter.CTkButton(master=self)
+        self.reset_input.configure(text='Сбросить', fg_color='firebrick4', hover_color='firebrick', command='')
+        self.reset_input.grid(row=3, column=0, sticky='ew')
+
+        self.execution_time = customtkinter.CTkLabel(master=self)
+        self.execution_time.configure(text='Время выполнения:')
+        self.execution_time.grid(row=3, column=2, sticky='w')
+
+    def set_ex_time(self, ex_time):
+        self.execution_time.configure(text='Время выполнения: {}'.format(ex_time))
 
 
 class ConfigurationFrame(customtkinter.CTkFrame):
@@ -297,7 +310,7 @@ class App(customtkinter.CTk):
         super().__init__()
 
         self.title("SP-network")
-        self.geometry("850x650")
+        self.geometry("850x550")
 
         self.tab_view = TabView(self)
         self.tab_view.pack(expand=True, fill='both', padx=5, pady=(0, 5))
@@ -311,7 +324,7 @@ class App(customtkinter.CTk):
         self.s_box_frame = SboxScrollableFrame(master=self.tab_view.tab("Шифратор"))
         self.s_box_frame.grid(row=1, sticky='ew', columnspan=2, padx=20, pady=20)
 
-        self.cipher_text_frame = OutСiphertextFrame(master=self.tab_view.tab("Шифратор"))
+        self.cipher_text_frame = OutCiphertextFrame(master=self.tab_view.tab("Шифратор"))
         self.cipher_text_frame.grid(row=2, column=0, sticky='ew', padx=20, pady=(0, 20))
 
         self.start_encryption_button = StartEncryptionFrame(master=self.tab_view.tab("Шифратор"),
@@ -384,7 +397,15 @@ class App(customtkinter.CTk):
             p_box = gen_pbox(S, N)
             implementation = int(P_option)
             sp = SPN(s_box, p_box, key, Rounds, implementation)
+
+            start = time.time_ns()
+            print(start)
             encrypted_plaintext = sp.encrypt(plaintext)
+            end = time.time_ns()
+            print(end)
+            ex_time = end - start
+            self.start_encryption_button.set_ex_time(ex_time)
+
             out_cipher_text = int_to_str_with_fill(encrypted_plaintext, Str_len)
             self.cipher_text_frame.set_cipher_text(out_cipher_text)
 
