@@ -116,14 +116,17 @@ class InputPlaintextFrame(customtkinter.CTkFrame):
         self.plaintext_entry.grid(row=1, sticky='nsew', padx=10, pady=(5, 10))
 
         self.error_plaintext_label = customtkinter.CTkLabel(master=self)
-        self.error_plaintext_label.configure(text='', text_color='brown2', width=240, height=35)
+        self.error_plaintext_label.configure(text='', width=240, height=35)
         self.error_plaintext_label.grid(row=2, sticky='w', padx=10, pady=(2, 10))
 
     def get(self):
         return self.plaintext_entry.get()
 
-    def set_error(self, error):
-        self.error_plaintext_label.configure(text=error)
+    def set_input(self, text):
+        self.plaintext_entry.insert(0, text)
+
+    def set_error(self, error, text_color='brown2'):
+        self.error_plaintext_label.configure(text=error, text_color=text_color)
 
     def reset_input(self):
         self.plaintext_entry.delete(0, 'end')
@@ -145,14 +148,17 @@ class InputKeyFrame(customtkinter.CTkFrame):
         self.key_entry.grid(row=1, sticky='ew', padx=10, pady=(5, 10))
 
         self.error_key_label = customtkinter.CTkLabel(master=self)
-        self.error_key_label.configure(text='', text_color='brown2', width=240, height=35)
-        self.error_key_label.grid(row=2, sticky='we', padx=10, pady=(2, 10))
+        self.error_key_label.configure(text='', width=240, height=35)
+        self.error_key_label.grid(row=2, sticky='w', padx=10, pady=(2, 10))
 
     def get(self):
         return self.key_entry.get()
 
-    def set_error(self, error):
-        self.error_key_label.configure(text=error)
+    def set_input(self, text):
+        self.key_entry.insert(0, text)
+
+    def set_error(self, error, text_color='brown2'):
+        self.error_key_label.configure(text=error, text_color=text_color)
 
     def reset_input(self):
         self.key_entry.delete(0, 'end')
@@ -171,11 +177,11 @@ class SboxScrollableFrame(customtkinter.CTkScrollableFrame):
         self.input_s_box_frame = InputSboxFrame(master=self)
         self.input_s_box_frame.grid(row=1, sticky='nsew', padx=10, pady=(0, 10), ipadx=10)
 
-        self.error_s_box_label = customtkinter.CTkLabel(master=self, text='', text_color='brown2', height=35)
+        self.error_s_box_label = customtkinter.CTkLabel(master=self, text='', height=35)
         self.error_s_box_label.grid(row=2, column=0, sticky='w', padx=20, pady=(2, 5))
 
-    def set_error(self, error):
-        self.error_s_box_label.configure(text=error)
+    def set_error(self, error, text_color='brown2'):
+        self.error_s_box_label.configure(text=error, text_color=text_color)
 
 
 class InputSboxFrame(customtkinter.CTkFrame):
@@ -219,6 +225,10 @@ class InputSboxFrame(customtkinter.CTkFrame):
     def get_sbox_entries(self):
         return self.sbox_entries_list
 
+    def reset_sbox_entries(self):
+        for entry in self.sbox_entries_list:
+            entry.delete(0, 'end')
+
 
 class OutCiphertextFrame(customtkinter.CTkFrame):
     def __init__(self, master):
@@ -238,14 +248,20 @@ class OutCiphertextFrame(customtkinter.CTkFrame):
         self.cipher_text_entry.insert(0, cipher_text)
         self.cipher_text_entry.configure(state='disable')
 
+    def reset_cipher_text(self):
+        self.cipher_text_entry.configure(state='normal')
+        self.cipher_text_entry.delete(0, 'end')
+        self.cipher_text_entry.configure(state='disable')
+
 
 class StartEncryptionFrame(customtkinter.CTkFrame):
-    def __init__(self, master, command):
+    def __init__(self, master, start_command, reset_command):
         super().__init__(master)
 
         self.columnconfigure(1, weight=1)
         self.rowconfigure((0, 2, 4), weight=1)
-        self.start_command = command
+        self.start_command = start_command
+        self.reset_command = reset_command
 
         self.start_encryption_button = customtkinter.CTkButton(master=self)
         self.start_encryption_button.configure(text='Зашифровать', height=50, command=self.start_command)
@@ -253,7 +269,7 @@ class StartEncryptionFrame(customtkinter.CTkFrame):
 
         self.reset_input = customtkinter.CTkButton(master=self)
         self.reset_input.configure(text='Сбросить', width=80, fg_color='firebrick4', hover_color='firebrick',
-                                   command='')
+                                   command=self.reset_command)
         self.reset_input.grid(row=3, column=1, sticky='e')
 
         self.execution_time = customtkinter.CTkLabel(master=self)
@@ -338,7 +354,8 @@ class App(customtkinter.CTk):
         self.cipher_text_frame.grid(row=2, column=0, sticky='ew', padx=20, pady=(0, 20))
 
         self.start_encryption_button = StartEncryptionFrame(master=self.tab_view.tab("Шифратор"),
-                                                            command=self.start_encryption)
+                                                            start_command=self.start_encryption,
+                                                            reset_command=self.clear_input)
         self.start_encryption_button.grid(row=2, column=1, sticky='nsew', padx=20, pady=(0, 20))
 
         self.configuration_frame = ConfigurationFrame(master=self.tab_view.tab("Конфигурация шифратора"),
@@ -374,13 +391,23 @@ class App(customtkinter.CTk):
         error = False
 
         if len(self.plaintext_frame.get()) != entry_limit:
-            error = True
-            self.plaintext_frame.set_error('Ошибка ввода открытого текста\nЧисло должно быть девятизначным')
+            if self.plaintext_frame.get() == '':
+                self.plaintext_frame.set_input(generate_binary_string())
+                self.plaintext_frame.set_error('Автоподстановка значения', text_color='yellow2')
+            else:
+                error = True
+                self.plaintext_frame.set_error('Ошибка ввода открытого текста\n'
+                                               'Число должно быть {}-значным'.format(Str_len))
         else:
             self.plaintext_frame.set_error('')
         if len(self.key_frame.get()) != entry_limit:
-            error = True
-            self.key_frame.set_error('Ошибка ввода ключа\nЧисло должно быть девятизначным')
+            if self.key_frame.get() == '':
+                self.key_frame.set_input(generate_binary_string())
+                self.key_frame.set_error('Автоподстановка значения', text_color='yellow2')
+            else:
+                error = True
+                self.key_frame.set_error('Ошибка ввода ключа\n'
+                                         'Число должно быть {}-значным'.format(Str_len))
         else:
             self.key_frame.set_error('')
         s_box_list = []
@@ -389,11 +416,13 @@ class App(customtkinter.CTk):
             value = entry.get()
             if len(value) == 0:
                 error = True
-                self.s_box_frame.set_error('Ошибка ввода значений S-блока\nВведите все значения S-блока')
+                self.s_box_frame.set_error('Ошибка ввода значений S-блока\n'
+                                           'Введите все значения S-блока')
                 break
             if int(value) in s_box_list:
                 error = True
-                self.s_box_frame.set_error('Ошибка ввода значений S-блока\nЗначения S-блока дублируются')
+                self.s_box_frame.set_error('Ошибка ввода значений S-блока\n'
+                                           'Значения S-блока дублируются')
                 break
             s_box_list.append(int(value))
         return error
@@ -414,15 +443,24 @@ class App(customtkinter.CTk):
             encrypted_plaintext = sp.encrypt(plaintext)
             end = time.time()
             print(end)
-            ex_time = float(round(Decimal(end - start), 5))
+            ex_time = float(round(Decimal(end - start), 6))
             self.start_encryption_button.set_ex_time(ex_time)
 
             out_cipher_text = int_to_str_with_fill(encrypted_plaintext, Str_len)
             self.cipher_text_frame.set_cipher_text(out_cipher_text)
 
+    def reset_errors(self):
+        self.plaintext_frame.set_error('')
+        self.key_frame.set_error('')
+        self.s_box_frame.set_error('')
+
     def clear_input(self):
         self.plaintext_frame.reset_input()
         self.key_frame.reset_input()
+        self.s_box_frame.input_s_box_frame.reset_sbox_entries()
+        self.cipher_text_frame.reset_cipher_text()
+        self.start_encryption_button.set_ex_time('')
+        self.reset_errors()
 
 
 app = App()
