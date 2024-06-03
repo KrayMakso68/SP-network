@@ -3,14 +3,16 @@ import re
 import time
 from decimal import Decimal
 
-from spn import SPN, gen_pbox, int_to_str_with_fill
 import customtkinter
+
+from spn import SPN, gen_pbox, int_to_str_with_fill
 
 customtkinter.set_appearance_mode("dark")
 
 S: int = 3  # число входов в s-блок
 N: int = 3  # число s-блоков
 Str_len: int = S * N  # длина входного слова
+Sbox_len: int = 2**S  # длина s-блока
 Rounds: int = 2  # кол-во полных раундов шифрования
 P_option: bool = False  # операция перестановки в конце
 
@@ -53,13 +55,12 @@ def validate_s_box(action, value_if_allowed):
         Release permission value
 
     """
-    input_limit = 2 ** S
     if action == "1":
         try:
             if len(value_if_allowed) > 1 and value_if_allowed[0] == "0":
                 return False
             num = int(value_if_allowed)
-            if 0 <= num < input_limit:
+            if 0 <= num < Sbox_len:
                 return True
             else:
                 return False
@@ -85,6 +86,23 @@ def generate_binary_string():
     length: int = Str_len
     binary_string = ''.join(random.choices(binary_digits, k=length))
     return binary_string
+
+
+def generate_sbox_list():
+    """
+    Generates a list of strings representing a s_box
+
+    Returns
+    -------
+    list of int
+        Returns a new generated sbox list
+    """
+    seen = set()
+    while len(seen) < Sbox_len:
+        seen.add(random.randint(0, Sbox_len-1))
+    seen = list(seen)
+    random.shuffle(seen)
+    return seen
 
 
 class TabView(customtkinter.CTkTabview):
@@ -200,9 +218,8 @@ class InputSboxFrame(customtkinter.CTkFrame):
 
     def create_sbox_labels(self, master):
         label_s_box_list = []
-        global S
-        limit = 2 ** S
-        for i in range(limit):
+        global Sbox_len
+        for i in range(Sbox_len):
             ent = customtkinter.CTkEntry(master, width=35, state='normal')
             ent.insert(0, f'{i}')
             ent.grid(row=0, column=i + 1, pady=(5, 2))
@@ -212,9 +229,8 @@ class InputSboxFrame(customtkinter.CTkFrame):
 
     def create_sbox_entries(self, master):
         entry_s_box_list = []
-        global S
-        limit = 2 ** S
-        for i in range(limit):
+        global Sbox_len
+        for i in range(Sbox_len):
             ent = customtkinter.CTkEntry(master=master)
             ent.configure(width=35, state='normal', validate="key",
                           validatecommand=(self.register(validate_s_box), '%d', '%P'))
@@ -321,10 +337,11 @@ class ConfigurationFrame(customtkinter.CTkFrame):
         self.set_button.grid(row=0, column=3, padx=0, pady=0, ipadx=10)
 
     def set_config(self):
-        global S, N, Str_len, Rounds, P_option
+        global S, N, Str_len, Sbox_len, Rounds, P_option
         S = int(self.S_var.get())
         N = int(self.N_var.get())
         Str_len = S * N
+        Sbox_len = 2 ** S
         Rounds = int(self.rounds_var.get())
         P_option = self.p_option_var.get()
         self.root.update_input()
@@ -386,7 +403,7 @@ class App(customtkinter.CTk):
         self.start_encryption_button.set_ex_time('')
 
     def check_configuration(self):
-        global Str_len
+        global Str_len, S, Sbox_len
         entry_limit = Str_len
         error = False
 
@@ -410,21 +427,26 @@ class App(customtkinter.CTk):
                                          'Число должно быть {}-значным'.format(Str_len))
         else:
             self.key_frame.set_error('')
-        s_box_list = []
+
         self.s_box_frame.set_error('')
+        s_box_set = set()
         for entry in self.s_box_frame.input_s_box_frame.get_sbox_entries():
-            value = entry.get()
-            if len(value) == 0:
+            s_box_set.add(entry.get())
+        if '' in s_box_set:
+            if len(s_box_set) == 1:
+                gen_sbox = generate_sbox_list()
+                sbox_entries = self.s_box_frame.input_s_box_frame.get_sbox_entries()
+                for index, entry in enumerate(sbox_entries):
+                    entry.insert(0, str(gen_sbox[index]))
+                self.s_box_frame.set_error('Автоподстановка значения', text_color='yellow2')
+            else:
                 error = True
                 self.s_box_frame.set_error('Ошибка ввода значений S-блока\n'
                                            'Введите все значения S-блока')
-                break
-            if int(value) in s_box_list:
-                error = True
-                self.s_box_frame.set_error('Ошибка ввода значений S-блока\n'
-                                           'Значения S-блока дублируются')
-                break
-            s_box_list.append(int(value))
+        elif len(s_box_set) < Sbox_len:
+            error = True
+            self.s_box_frame.set_error('Ошибка ввода значений S-блока\n'
+                                       'Значения S-блока дублируются')
         return error
 
     def start_encryption(self):
@@ -439,10 +461,8 @@ class App(customtkinter.CTk):
             sp = SPN(s_box, p_box, key, Rounds, implementation)
 
             start = time.time()
-            print(start)
             encrypted_plaintext = sp.encrypt(plaintext)
             end = time.time()
-            print(end)
             ex_time = float(round(Decimal(end - start), 6))
             self.start_encryption_button.set_ex_time(ex_time)
 
