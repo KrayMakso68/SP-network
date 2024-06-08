@@ -1,3 +1,4 @@
+import enum
 import random
 import re
 import time
@@ -10,12 +11,22 @@ from spn import SPN, gen_pbox, int_to_str_with_fill
 
 customtkinter.set_appearance_mode("dark")
 
+
+class KeyGenStatus(enum.Enum):
+    short = 'сокращённая'
+    half = 'половина'
+    full = 'полный перебор'
+
+
 S: int = 3  # число входов в s-блок
 N: int = 3  # число s-блоков
 Str_len: int = S * N  # длина входного слова
 Sbox_len: int = 2 ** S  # длина s-блока
 Rounds: int = 2  # кол-во полных раундов шифрования
 P_option: bool = False  # операция перестановки в конце
+
+Key_gen_status = KeyGenStatus.short.value  # выбор режима генерации набора ключей
+PT_amount: int = 5  # количество текстов для проверки
 
 
 def validate_binary_string(newval):
@@ -98,17 +109,23 @@ def generating_possible_keys() -> list[str]:
     list of str
         Returns a list of possible keys
     """
-    keys = sqrt(2 * (2 ** Str_len) * log(100))
-    keys_list = set()
-    while len(keys_list) < keys:
-        keys_list.add(generate_binary_string())
-    keys_list = list(keys_list)
-
-    # global Str_len
-    # keys = 2 ** Str_len
-    # keys_list = [int_to_str_with_fill(key, str_len=Str_len) for key in range(keys)]
-    # random.shuffle(keys_list)
-
+    keys_list = []
+    if Key_gen_status == KeyGenStatus.short.value:
+        keys = sqrt(2 * (2 ** Str_len) * log(100))
+        keys_list = set()
+        while len(keys_list) < keys:
+            keys_list.add(generate_binary_string())
+        keys_list = list(keys_list)
+    elif Key_gen_status == KeyGenStatus.half.value:
+        keys = 2 ** Str_len / 2
+        keys_list = set()
+        while len(keys_list) < keys:
+            keys_list.add(generate_binary_string())
+        keys_list = list(keys_list)
+    elif Key_gen_status == KeyGenStatus.full.value:
+        keys = 2 ** Str_len
+        keys_list = [int_to_str_with_fill(key, str_len=Str_len) for key in range(keys)]
+        random.shuffle(keys_list)
     return keys_list
 
 
@@ -151,6 +168,7 @@ class ConfigurationTabFrame(customtkinter.CTkFrame):
 
         self.root = root
         self.tab_view = root.tab_view
+        self.combobox_values = ["сокращённая", "половина", "полный перебор"]
 
         customtkinter.CTkLabel(master=self, text="Число входов в S-блок:"
                                ).grid(row=0, column=1, padx=0, pady=0, sticky='e')
@@ -176,30 +194,30 @@ class ConfigurationTabFrame(customtkinter.CTkFrame):
         self.config_option_checkbox = customtkinter.CTkCheckBox(master=self, variable=self.p_option_var, text='')
         self.config_option_checkbox.grid(row=3, column=2, padx=20, pady=5, sticky='w')
 
-        self.set_button = customtkinter.CTkButton(master=self)
-        self.set_button.configure(text='Установить конфигурацию шифратора', height=40, width=250, command=self.set_config)
-        self.set_button.grid(row=0, column=3, padx=0, pady=0, ipadx=10)
-
+        self.set_encoder_button = customtkinter.CTkButton(master=self)
+        self.set_encoder_button.configure(text='Установить конфигурацию шифратора', height=40, width=250,
+                                          command=self.set_encoder_config)
+        self.set_encoder_button.grid(row=0, column=3, padx=0, pady=0, ipadx=10)
 
         customtkinter.CTkLabel(master=self, text="Генерация множества ключей:"
                                ).grid(row=5, column=1, padx=0, pady=(100, 0), sticky='e')
-        self.combobox_var = customtkinter.StringVar(value="сокращённая")
-        self.combobox = customtkinter.CTkComboBox(master=self, values=["сокращённая", "полный перебор"],
-                                                  variable=self.combobox_var, width=150)
-        self.combobox.grid(row=5, column=2, padx=20, pady=(100, 5), sticky='w')
+        self.gen_combobox_var = customtkinter.StringVar(value="сокращённая")
+        self.gen_combobox = customtkinter.CTkComboBox(master=self, values=self.combobox_values,
+                                                      variable=self.gen_combobox_var, width=150)
+        self.gen_combobox.grid(row=5, column=2, padx=20, pady=(100, 5), sticky='w')
 
         customtkinter.CTkLabel(master=self, text="Количество текстов для проверки:"
                                ).grid(row=6, column=1, padx=0, pady=0, sticky='e')
-        self.S_var = customtkinter.StringVar(value='3')
-        self.s_entry = customtkinter.CTkEntry(master=self, textvariable=self.S_var, width=40)
-        self.s_entry.grid(row=6, column=2, padx=20, pady=5, sticky='w')
+        self.pt_amount_var = customtkinter.StringVar(value='5')
+        self.pt_amount_entry = customtkinter.CTkEntry(master=self, textvariable=self.pt_amount_var, width=40)
+        self.pt_amount_entry.grid(row=6, column=2, padx=20, pady=5, sticky='w')
 
-        self.set_button = customtkinter.CTkButton(master=self)
-        self.set_button.configure(text='Установить конфигурацию атаки', height=40, width=250, command=self.set_config)
-        self.set_button.grid(row=5, column=3, padx=0, pady=(95, 0), ipadx=10)
+        self.set_attack_button = customtkinter.CTkButton(master=self)
+        self.set_attack_button.configure(text='Установить конфигурацию атаки', height=40, width=250,
+                                         command=self.set_attack_config)
+        self.set_attack_button.grid(row=5, column=3, padx=0, pady=(95, 0), ipadx=10)
 
-
-    def set_config(self):
+    def set_encoder_config(self):
         global S, N, Str_len, Sbox_len, Rounds, P_option
         S = int(self.S_var.get())
         N = int(self.N_var.get())
@@ -210,8 +228,15 @@ class ConfigurationTabFrame(customtkinter.CTkFrame):
         self.root.encoder_frame.update_input()
         self.root.encoder_frame.reset_errors()
         self.root.meet_in_the_middle_frame.update_input()
+        self.root.meet_in_the_middle_frame.key_pairs.clear_keys()
         self.root.meet_in_the_middle_frame.reset_errors()
         self.tab_view.set("Шифратор")
+
+    def set_attack_config(self):
+        global Key_gen_status, PT_amount
+        Key_gen_status = self.gen_combobox_var.get()
+        PT_amount = int(self.pt_amount_var.get())
+        self.tab_view.set("Метод встречи по середине")
 
 
 class EncoderTabFrame(customtkinter.CTkFrame):
@@ -394,13 +419,15 @@ class MeetInTheMiddleTabFrame(customtkinter.CTkFrame):
         self.check_pairs_frame.input_key1.destroy()
         self.check_pairs_frame.input_key1 = customtkinter.CTkEntry(master=self.check_pairs_frame)
         self.check_pairs_frame.input_key1.configure(placeholder_text=generate_binary_string(),
-                                                    validate="key", validatecommand=(self.register(validate_binary_string), '%P'))
+                                                    validate="key",
+                                                    validatecommand=(self.register(validate_binary_string), '%P'))
         self.check_pairs_frame.input_key1.grid(row=2, sticky='nsew', padx=10, pady=(0, 5))
 
         self.check_pairs_frame.input_key2.destroy()
         self.check_pairs_frame.input_key2 = customtkinter.CTkEntry(master=self.check_pairs_frame)
         self.check_pairs_frame.input_key2.configure(placeholder_text=generate_binary_string(),
-                                                    validate="key", validatecommand=(self.register(validate_binary_string), '%P'))
+                                                    validate="key",
+                                                    validatecommand=(self.register(validate_binary_string), '%P'))
         self.check_pairs_frame.input_key2.grid(row=4, sticky='nsew', padx=10, pady=(0, 5))
 
         self.start_encryption_button.set_ex_time('')
@@ -475,27 +502,19 @@ class MeetInTheMiddleTabFrame(customtkinter.CTkFrame):
             end = time.time()
             ex_time = float(round(Decimal(end - start), 3))
             self.start_encryption_button.set_ex_time(ex_time)
-
-            # k1 = '101111100'
-            # sp = SPN(s_box, p_box, int(k1, 2), Rounds, implementation)
-            # possible_keys_list.append(int_to_str_with_fill(sp.decrypt(int('111001001', 2)), str_len=9))
-
             self.key_pairs.key_pairs_frame.set_list(possible_keys_list)
-            # print(possible_keys_list)
 
     def check_key_pairs(self):
-        global S, N, Rounds, P_option, Str_len
-
-        print(self.check_pairs_frame.check_input())
-        print(not self.check_configuration())
+        global S, N, Rounds, P_option, Str_len, PT_amount
 
         if self.check_pairs_frame.check_input() and not self.check_configuration():
             key_checkboxes = self.key_pairs.get_checkboxes()
-            s_box = [int(entry.get()) for entry in self.root.encoder_frame.s_box_frame.input_s_box_frame.get_sbox_entries()]
+            s_box = [int(entry.get()) for entry in
+                     self.root.encoder_frame.s_box_frame.input_s_box_frame.get_sbox_entries()]
             p_box = gen_pbox(S, N)
             implementation = int(P_option)
 
-            plaintext_list = [generate_binary_string() for _ in range(5)]
+            plaintext_list = [generate_binary_string() for _ in range(PT_amount)]
             ciphertext_list = []
             control_key1, control_key2 = self.check_pairs_frame.get_keys_list()
             for plaintext in plaintext_list:
@@ -514,50 +533,12 @@ class MeetInTheMiddleTabFrame(customtkinter.CTkFrame):
                     middle_text = sp1.encrypt(int(plaintext, 2))
                     sp2 = SPN(s_box, p_box, int(k2, 2), Rounds, implementation)
                     ciphertext = sp2.encrypt(middle_text)
-                    print(i)
                     if not ciphertext == ciphertext_list[i]:
                         valid = False
                         break
                 if valid:
                     key_checkbox.select()
                     key_checkbox.configure(state='disable')
-
-
-        # if not self.check_configuration():
-        #     p = int(self.plaintext_frame.get(), 2)
-        #     c = int(self.ciphertext_frame.get(), 2)
-        #     key_checkboxes = self.key_pairs.get_checkboxes()
-        #     s_box = [int(entry.get()) for entry in
-        #              self.root.encoder_frame.s_box_frame.input_s_box_frame.get_sbox_entries()]
-        #     p_box = gen_pbox(S, N)
-        #     implementation = int(P_option)
-        #
-        #     P = '011000110'
-        #     K1 = '101000100'
-        #     K2 = '001000101'
-        #
-        #     SP1 = SPN(s_box, p_box, int(K1, 2), Rounds, implementation)
-        #     MD = SP1.encrypt(int(P, 2))
-        #     SP2 = SPN(s_box, p_box, int(K2, 2), Rounds, implementation)
-        #     C = SP2.encrypt(MD)
-        #
-        #     for checkbox in key_checkboxes:
-        #
-        #         pair = checkbox.cget('text')
-        #         k1, k2 = pair[0], pair[1]
-        #         sp1 = SPN(s_box, p_box, int(k1, 2), Rounds, implementation)
-        #         middle_text = sp1.encrypt(p)
-        #         sp2 = SPN(s_box, p_box, int(k2, 2), Rounds, implementation)
-        #         c_test = sp2.encrypt(middle_text)
-        #
-        #         sp3 = SPN(s_box, p_box, int(k1, 2), Rounds, implementation)
-        #         middle_text3 = sp3.encrypt(int(P, 2))
-        #         sp4 = SPN(s_box, p_box, int(k2, 2), Rounds, implementation)
-        #         C_test = sp4.encrypt(middle_text3)
-        #
-        #         if c == c_test and C_test == C:
-        #             checkbox.select()
-        #             checkbox.configure(state='disable')
 
     def reset_errors(self):
         self.plaintext_frame.set_error('')
