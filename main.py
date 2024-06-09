@@ -688,7 +688,7 @@ class StartEncryptionFrame(customtkinter.CTkFrame):
         self.start_encryption_button.grid(row=1, column=0, sticky='nsew', columnspan=2, padx=10, pady=(5, 5))
 
         self.execution_time = customtkinter.CTkLabel(master=self)
-        self.execution_time.configure(text='Время выполнения: ', width=165)
+        self.execution_time.configure(text='Время выполнения: ')
         self.execution_time.grid(row=3, column=0, sticky='w', padx=(10, 0), pady=(0, 5))
 
         self.reset_input = customtkinter.CTkButton(master=self)
